@@ -1,0 +1,19 @@
+Amino-acid, Abbr, Desc, FreeEnergy
+Glutamine, Gln, Q, -100
+Asparagine, Asn, N, -10
+Glycine, Gly, G, 0
+Alanine, Ala, A, 730 
+Valine, Val, V, 1690 
+Leucine, Leu, L, 2420 
+Isoleucine, Ile, I, 2970 
+Phenylalanine, Phe, F, 2650 
+Proline, Pro, P, 2600
+Methionine, Met, M, 1300 
+Tyrosine, Tyr, Y, 2870 
+Threonine, Thr, T, 440
+Serine, Ser, S, 40
+Aspartic acid, Asp, D, 540
+Glutamic acid, Glu, E, 550
+Arginine, Arg, R, 730
+Lysine, Lys, K, 1500 
+Triptophan, Trp, W, 3000
