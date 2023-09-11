@@ -5,3 +5,12 @@ There are two parts of this project:
         - Clustering using OPTICS clustering method. (found 4 clusters)
     - Node level details   
 2. Cross Validation
+
+
+##
+```bash
+conda create -n bittepep python=3.9
+conda activate bitterpep
+pip install poetry
+poetry install
+```

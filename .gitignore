@@ -1,2 +1,7 @@
 # ignore webapi
-/source/webapi/bitterdbdata.tsv
+*.pdf
+*.csv
+*.tsv
+
+# data folder
+data/
