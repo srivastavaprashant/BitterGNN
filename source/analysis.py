@@ -18,8 +18,9 @@ from sklearn.cluster import KMeans
 from torch.optim import Adam
 from torch.nn import CrossEntropyLoss
 
-
-from settings import DATA_DIR, AMINO_ACIDS
+from sklearn.decomposition import PCA
+from scripts.settings import DATA_DIR, AMINO_ACIDS
+import umap
 
 
 def read_data(data_dir=DATA_DIR):
@@ -125,45 +126,65 @@ def get_graph_embeddings(model, data_loader, encoder):
                 "conv3_feats": conv3_feats[node_indexes].numpy(),
             }
             graph_embeddings.append(d)
-            
+
     for k in range(len(graph_embeddings)):
-        graph_embeddings[k]['avg_desc_act'] = graph_embeddings[k]['conv3_feats'].mean(axis=1)
+        graph_embeddings[k]["avg_desc_act"] = graph_embeddings[k]["conv3_feats"].mean(
+            axis=1
+        )
     return graph_embeddings
 
 
-def pepvecs_2d_plot(all_graph_embeddings):
+def pepvecs_2d_plot(all_graph_embeddings, method=any(["tsne", "umap", "pca"])):
+    def _tsne(conv_feats):
+        tsne = TSNE(n_components=2, random_state=911)
+        tsne_embd = tsne.fit_transform(conv_feats)
+        print("KL Div:", tsne.kl_divergence_)
+        return tsne_embd
+
+    def _umap(conv_feats):
+        umap_embd = umap.UMAP(n_components=2, random_state=911).fit_transform(
+            conv_feats
+        )
+        return umap_embd
+
+    def _pca(conv_feats):
+        pca = PCA(n_components=2, random_state=911)
+        pca_embd = pca.fit_transform(conv_feats)
+        return pca_embd
+
     descs = []
     conv_feats = np.zeros((len(all_graph_embeddings), 16))
     labels = []
     pred_vals = []
     for i in range(len(all_graph_embeddings)):
         descs.append(all_graph_embeddings[i]["desc"])
-        conv_feats[i] = (
-            all_graph_embeddings[i]["conv3_feats"].mean(axis=0)
-        )
+        conv_feats[i] = all_graph_embeddings[i]["conv3_feats"].mean(axis=0)
         labels.append(all_graph_embeddings[i]["label"])
         pred_vals.append(all_graph_embeddings[i]["pred"])
-    tsne = TSNE(n_components=2, random_state=911)
-    tsne_embd = tsne.fit_transform(conv_feats)
-    print("KL Div:", tsne.kl_divergence_)
 
-    plt.figure(figsize=(8, 8))
+    if method == "tsne":
+        embd = _tsne(conv_feats)
+    elif method == "umap":
+        embd = _umap(conv_feats)
+    elif method == "pca":
+        embd = _pca(conv_feats)
+
+    fig = plt.figure(figsize=(8, 8))
     plt.scatter(
-        tsne_embd[:, 0],
-        tsne_embd[:, 1],
+        embd[:, 0],
+        embd[:, 1],
         c=[color_palette()[x + 2] for x in labels],
         s=3,
         label="Bitter",
     )
     plt.legend()
-    plt.title("TSNE plot of all peptide graph embeddings")
+    plt.title(f"{method.upper()} plot of all peptide graph embeddings")
     plt.xticks([])
     plt.yticks([])
     plt.legend()
     plt.tight_layout()
-    plt.savefig("TSNE Embedding plot.pdf")
-    plt.show()
-    return tsne_embd, descs, labels
+    plt.close(fig)
+    return embd, descs, labels, fig
 
 
 def train(model, train_loader, criterion, optimizer):
@@ -202,16 +223,21 @@ def predict(dataloader, model):
     return lab, out
 
 
-def get_kmeans_clusters(embd, descs, all_graph_embeddings):
-    clustering = KMeans(4)
-    clustering = KMeans(4)
-    # Run the fit
-    clustering.fit(embd)
-    np.unique(clustering.labels_)
+def get_clusters(
+    embd, descs, all_graph_embeddings, method="kmeans", method_args={}, embd_type="2d"
+):
+    embd = np.array(embd)
+    if method == "kmeans":
+        clustering = KMeans(**method_args)
+        # Run the fit
+        clustering.fit(embd)
+
+    else:
+        raise ValueError("Invalid clustering method")
 
     # Get the results
-    clusters = pd.DataFrame([descs, embd[:, 0], embd[:, 1], clustering.labels_]).T
-    clusters.columns = ["desc", "TSNE1", "TSNE2", "Cluster"]
+    clusters = pd.DataFrame([descs, clustering.labels_]).T
+    clusters.columns = ["desc", "Cluster"]
     emb = pd.DataFrame(all_graph_embeddings)
     clusters = emb.merge(clusters, on="desc")
     clusters["acc"] = 1 * (clusters.pred == clusters.label)
@@ -220,74 +246,50 @@ def get_kmeans_clusters(embd, descs, all_graph_embeddings):
         clusters.groupby("Cluster").label.mean().rank().to_dict()
     )
     clusters["ClusterName"] = clusters.Cluster.apply(lambda x: f"Cluster-{x:1.0f}")
-    fig = plt.figure(constrained_layout=True, figsize=(12, 8))
-    gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], figure=fig)
 
-    ax0 = plt.subplot(gs[0])
-    ax1 = plt.subplot(gs[1])
+    if embd.shape[1] == 2:
+        fig = plt.figure(constrained_layout=True, figsize=(12, 8))
+        gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], figure=fig)
+        ax0 = plt.subplot(gs[0])
+        ax1 = plt.subplot(gs[1])
+        scatterplot(
+            x=embd[:, 0], y=embd[:, 1], hue=clusters["ClusterName"], ax=ax0,
+        )
+        fig.suptitle(
+            f"{method.lower()} clusters plot for {embd_type} peptide embeddings"
+        )
+    else:
+        fig = plt.figure(figsize=(4, 8))
+        gs = gridspec.GridSpec(1, 1, width_ratios=[1], figure=fig)
+        ax1 = plt.subplot(gs[0])
+        fig.suptitle(
+            f"{method.lower()} clusters plot for {embd_type} peptide embeddings"
+        )
 
-    # sequential_colors = sns.color_palette("RdPu", 4)
-    # sns.palplot(sequential_colors)
-    # sns.set_palette('YlGn')
-    clusters = clusters.sort_values(by="ClusterName")
-    scatterplot(
-        x=clusters["TSNE1"], y=clusters["TSNE2"], hue=clusters["ClusterName"], ax=ax0,
+    unique_clusters = clusters.Cluster.unique()
+    unique_clusters.sort()
+    aminoacid_pop_in_clusters = (
+        pd.DataFrame(
+            [
+                clusters[clusters["Cluster"] == i]
+                .desc.apply(lambda x: [j for j in x])
+                .explode()
+                .value_counts(normalize=True)
+                .rename(f"Cluster-{i}")
+                .round(2)
+                for i in unique_clusters
+            ]
+        )
+        .T.fillna(0)
+        .sort_index()
     )
-    # ell = Ellipse(xy=mean, width=width, height=height, angle = 180+angle)
-    # fig, ax = plt.subplots()
-
-    def plot_aminoacid_pop_in_clusters(clusters, ax):
-        cluster1 = clusters[clusters["Cluster"] == 1]
-        cluster2 = clusters[clusters["Cluster"] == 2]
-        cluster3 = clusters[clusters["Cluster"] == 3]
-        cluster4 = clusters[clusters["Cluster"] == 4]
-
-        aminoacid_pop_in_clusters = (
-            pd.DataFrame(
-                [
-                    cluster1.desc.apply(lambda x: [i for i in x])
-                    .explode()
-                    .value_counts(normalize=True)
-                    .rename("Cluster-1")
-                    .round(2),
-                    cluster2.desc.apply(lambda x: [i for i in x])
-                    .explode()
-                    .value_counts(normalize=True)
-                    .rename("Cluster-2")
-                    .round(2),
-                    cluster3.desc.apply(lambda x: [i for i in x])
-                    .explode()
-                    .value_counts(normalize=True)
-                    .rename("Cluster-3")
-                    .round(2),
-                    cluster4.desc.apply(lambda x: [i for i in x])
-                    .explode()
-                    .value_counts(normalize=True)
-                    .rename("Cluster-4")
-                    .round(2),
-                ]
-            )
-            .T.fillna(0)
-            .sort_index()
-        )
-
-        aminoacid_pop_in_clusters.plot(
-            kind="barh",
-            width=0.8,
-            ax=ax,
-            #
-            # colormap='YlGn'
-        )
-        ax.set_xlabel("Percent population of AminoAcids")
-        ax.set_ylabel("Amino Acids")
-        return aminoacid_pop_in_clusters, ax
-
-    aminoacid_pop_in_clusters, aa_pop = plot_aminoacid_pop_in_clusters(clusters, ax1)
-    # ax.add_patch(ell)
-    # ax.set_aspect('equal')
-    # ax.autoscale()
-    # plt.show()
-    return clusters, clustering, aminoacid_pop_in_clusters
+    aminoacid_pop_in_clusters.plot(
+        kind="barh", width=0.8, ax=ax1,
+    )
+    ax1.set_xlabel("Percent population of AminoAcids")
+    ax1.set_ylabel("Amino Acids")
+    plt.close(fig)
+    return clusters, clustering, aminoacid_pop_in_clusters, fig
 
 
 def train_model(model, protien_graphs, optimizer, criterion, epochs=10):
@@ -303,14 +305,14 @@ def train_model(model, protien_graphs, optimizer, criterion, epochs=10):
         print(f"Epoch: {epoch:03d}, Accuracy: {acc:.4f}")
 
     labels, output = predict(train_loader, model)
-    plot_roc(labels, output)
-    plt.show()
-
-    return model, train_loader, test_loader
+    fig, ax = plt.subplots(figsize=(6, 6))
+    plot_roc(labels, output, ax=ax)
+    plt.close(fig)
+    return model, train_loader, test_loader, fig
 
 
 def get_subseq_activations(all_graph_embeddings, l=1):
-    """Get the activations of substructures within the peptides. 
+    """Get the activations of substructures within the peptides.
     For example: In a list of peptides [PFA, VA], the substructures are:
         l = 1: V, P, F, A
         l = 2: VA, PF, FA
@@ -323,25 +325,33 @@ def get_subseq_activations(all_graph_embeddings, l=1):
         _type_: _description_
     """
     subseqs = []
-    seqdict = {}
+    seqdict = {}  # Dictionary to store the activations of the substructures
     avg_importance = []
 
+    # Get all possible substructures of length l
     for i, k in enumerate(itertools.product(AMINO_ACIDS, repeat=l)):
         subseqs.append("".join(k))
+
+    # Iterate over all peptides and get the list of activations of the substructures within the peptides.
     for i, d in enumerate(all_graph_embeddings):
+        # Iterate over all substructures within the peptide sequence
         for j in range(len(d["desc"]) - 1):
+            # Get the average activation of the substructure, sum the activations and divide by the length of the substructure
+            # If the substructure is not in the dictionary, add it else append the activation to the list
             if d["desc"][j : j + l] not in seqdict.keys():
-                seqdict[d["desc"][j : j + l]] = [
-                    sum(d["avg_desc_act"][j : j + l])/l
-                ]
+                seqdict[d["desc"][j : j + l]] = [sum(d["avg_desc_act"][j : j + l]) / l]
             else:
                 seqdict[d["desc"][j : j + l]] = seqdict[d["desc"][j : j + l]] + [
                     sum(d["avg_desc_act"][j : j + l]) / l
                 ]
 
+    # Finally, get the average importance of the substructures.
     for i in subseqs:
         if i in seqdict.keys():
             avg_importance.append(np.mean(seqdict[i]))
         else:
             avg_importance.append(0)
-    return subseqs, avg_importance
+
+    pepsdf = pd.DataFrame([subseqs, avg_importance]).T
+    pepsdf.columns = ["pep", "Imp"]
+    return pepsdf

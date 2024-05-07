@@ -111,12 +111,13 @@ def test(loader, model):
         correct += int((pred == data.y).sum())  # Check against ground-truth labels.
         accuracy = correct / len(loader.dataset)
         roc_auc = roc_auc_score(data.y.detach(), out.detach().numpy()[:, 1])
-    return np.round(accuracy, 2), np.round(
-        roc_auc, 2
+    return (
+        np.round(accuracy, 2),
+        np.round(roc_auc, 2),
     )  # Derive ratio of correct predictions.
 
 
-def run_kfold_test(nsplits, graph_data, MODEL_INST, h=16, lr=0.005, b=1):
+def run_kfold_test(nsplits, graph_data, MODEL_INST, h=16, lr=0.005, b=32):
     n_data = len(graph_data)
     fold_test_roc = []
     fold_test_acc = []

@@ -1,7 +1,5 @@
-# ignore webapi
-*.pdf
-*.csv
-*.tsv
-
 # data folder
 data/
+
+# cache
+*__pycache__*
