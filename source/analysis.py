@@ -24,6 +24,15 @@ import umap
 
 
 def read_data(data_dir=DATA_DIR):
+    """
+    Read the data from the specified directory and return a DataFrame.
+
+    Parameters:
+    - data_dir (str): The directory path where the data files are located. Default is DATA_DIR.
+
+    Returns:
+    - df (pandas.DataFrame): The concatenated DataFrame containing the data from all files.
+    """
     train_pos = pd.read_csv(data_dir + "train-positive.txt", header=None)
     train_neg = pd.read_csv(data_dir + "train-negative.txt", header=None)
     test_pos = pd.read_csv(data_dir + "test-positive.txt", header=None)
@@ -62,8 +71,18 @@ def read_data(data_dir=DATA_DIR):
 
 
 def preprocess(df):
+    """
+    Preprocesses the input dataframe to create input graph data for PyTorch Geometric model.
+
+    Args:
+        df (pandas.DataFrame): The input dataframe containing peptide sequences and labels.
+
+    Returns:
+        tuple: A tuple containing the list of protein graph data and the encoder used for one-hot encoding.
+
+    """
     def create_graph_data(str, label, enc):
-        """Create input graph data for Pytorch Geometric model."""
+        """Create input graph data for PyTorch Geometric model."""
         n = len(str)  # length of peptide
         # each peptide graph has n nodes and 2*(n-1) edges (bidirectional- up and down)
         edge_index_up = [[i, i + 1] for i in range(n - 1)]
@@ -94,6 +113,23 @@ def preprocess(df):
 
 
 def get_graph_embeddings(model, data_loader, encoder):
+    """
+    Compute graph embeddings for a given model, data loader, and encoder.
+
+    Args:
+        model (torch.nn.Module): The model used for computing graph embeddings.
+        data_loader (torch.utils.data.DataLoader): The data loader containing the input data.
+        encoder (Encoder): The encoder used for encoding the input data.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary contains the following information:
+            - 'desc': The description of the graph.
+            - 'n_nodes': The number of nodes in the graph.
+            - 'label': The label of the graph.
+            - 'pred': The predicted label of the graph.
+            - 'conv3_feats': The features extracted from the third convolutional layer.
+            - 'avg_desc_act': The average activation of the description features.
+    """
     activation = {}
 
     def get_activation(name):
@@ -135,6 +171,19 @@ def get_graph_embeddings(model, data_loader, encoder):
 
 
 def pepvecs_2d_plot(all_graph_embeddings, method=any(["tsne", "umap", "pca"])):
+    """
+    Plot the 2D visualization of peptide graph embeddings using the specified method.
+
+    Parameters:
+    - all_graph_embeddings (list): A list of dictionaries containing graph embeddings for each peptide.
+    - method (str): The method to use for dimensionality reduction. Options are "tsne", "umap", or "pca". Default is any(["tsne", "umap", "pca"]).
+
+    Returns:
+    - embd (numpy.ndarray): The 2D embeddings of the graph embeddings.
+    - descs (list): A list of descriptions for each peptide.
+    - labels (list): A list of labels for each peptide.
+    - fig (matplotlib.figure.Figure): The generated plot figure.
+    """
     def _tsne(conv_feats):
         tsne = TSNE(n_components=2, random_state=911)
         tsne_embd = tsne.fit_transform(conv_feats)
@@ -188,6 +237,18 @@ def pepvecs_2d_plot(all_graph_embeddings, method=any(["tsne", "umap", "pca"])):
 
 
 def train(model, train_loader, criterion, optimizer):
+    """
+    Trains the model using the provided training data.
+
+    Args:
+        model (torch.nn.Module): The model to be trained.
+        train_loader (torch.utils.data.DataLoader): The data loader for the training dataset.
+        criterion: The loss function used to compute the loss.
+        optimizer: The optimizer used to update the model's parameters.
+
+    Returns:
+        None
+    """
     model.train()
 
     for data in train_loader:  # Iterate in batches over the training dataset.
@@ -201,6 +262,16 @@ def train(model, train_loader, criterion, optimizer):
 
 
 def test(model, loader):
+    """
+    Evaluate the performance of the model on the test dataset.
+
+    Args:
+        model (torch.nn.Module): The trained model.
+        loader (torch.utils.data.DataLoader): The data loader for the test dataset.
+
+    Returns:
+        float: The ratio of correct predictions.
+    """
     model.eval()
 
     correct = 0
@@ -212,6 +283,16 @@ def test(model, loader):
 
 
 def predict(dataloader, model):
+    """
+    Predicts the output labels for the given dataloader using the provided model.
+
+    Args:
+        dataloader (torch.utils.data.DataLoader): The dataloader containing the input data.
+        model: The model used for prediction.
+
+    Returns:
+        tuple: A tuple containing the predicted labels and the model outputs.
+    """
     out = []
     lab = []
     for data in dataloader:
@@ -226,6 +307,24 @@ def predict(dataloader, model):
 def get_clusters(
     embd, descs, all_graph_embeddings, method="kmeans", method_args={}, embd_type="2d"
 ):
+    """
+    Perform clustering on peptide embeddings and visualize the results.
+
+    Args:
+        embd (numpy.ndarray): The embeddings of the peptides.
+        descs (list): The descriptions of the peptides.
+        all_graph_embeddings (list): The embeddings of all peptides.
+        method (str, optional): The clustering method to use. Defaults to "kmeans".
+        method_args (dict, optional): Additional arguments for the clustering method. Defaults to {}.
+        embd_type (str, optional): The type of peptide embeddings. Defaults to "2d".
+
+    Returns:
+        tuple: A tuple containing the following:
+            - clusters (pandas.DataFrame): The clusters and their corresponding descriptions.
+            - clustering: The clustering model.
+            - aminoacid_pop_in_clusters (pandas.DataFrame): The percentage population of amino acids in each cluster.
+            - fig: The plot figure.
+    """
     embd = np.array(embd)
     if method == "kmeans":
         clustering = KMeans(**method_args)
@@ -293,6 +392,19 @@ def get_clusters(
 
 
 def train_model(model, protien_graphs, optimizer, criterion, epochs=10):
+    """
+    Trains the given model using the provided protein graphs.
+
+    Args:
+        model (torch.nn.Module): The model to be trained.
+        protien_graphs (list): List of protein graphs.
+        optimizer (torch.optim.Optimizer): The optimizer used for training.
+        criterion (torch.nn.Module): The loss function used for training.
+        epochs (int, optional): Number of training epochs. Defaults to 10.
+
+    Returns:
+        tuple: A tuple containing the trained model, train loader, test loader, and the ROC plot figure.
+    """
     train_data, test_data = train_test_split(
         protien_graphs, test_size=1, random_state=6
     )

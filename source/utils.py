@@ -10,6 +10,15 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 def read_data(data_dir):
+    """
+    Read data from the specified directory.
+
+    Args:
+        data_dir (str): The directory path where the data files are located.
+
+    Returns:
+        pandas.DataFrame: The concatenated dataframe containing the data from all files.
+    """
     train_pos = pd.read_csv(data_dir + "train-positive.txt", header=None)
     train_neg = pd.read_csv(data_dir + "train-negative.txt", header=None)
     test_pos = pd.read_csv(data_dir + "test-positive.txt", header=None)
@@ -46,6 +55,17 @@ def read_data(data_dir):
 
 
 def create_graph_data(str, label, enc):
+    """
+    Create a graph data object for the given string, label, and encoder.
+
+    Args:
+        str (str): The input string.
+        label (int): The label for the input string.
+        enc (Encoder): The encoder object used to transform the string.
+
+    Returns:
+        Data: The graph data object containing node features, edge indices, and labels.
+    """
     n = len(str)
     edge_index_up = [[i, i + 1] for i in range(n - 1)]
     edge_index_down = [[i + 1, i] for i in range(n - 1)]
@@ -60,6 +80,16 @@ def create_graph_data(str, label, enc):
 
 
 def preprocess(df):
+    """
+    Preprocesses the input dataframe to create protein graphs.
+
+    Args:
+        df (pandas.DataFrame): The input dataframe containing 'bitter' and 'seq' columns.
+
+    Returns:
+        list: A list of protein graphs.
+
+    """
     df.iloc[:, 0] = df.iloc[:, 0].apply(lambda x: x.split(" ")[0][1:])
     df.columns = ["bitter", "seq"]
     labels = df.bitter.apply(lambda x: 1 if x == "Positive" else 0).tolist()
@@ -102,6 +132,16 @@ def train(train_loader, model, optimizer, criterion):
 
 
 def test(loader, model):
+    """
+    Evaluate the performance of the model on the given data loader.
+
+    Args:
+        loader (torch.utils.data.DataLoader): The data loader containing the test dataset.
+        model (torch.nn.Module): The model to be evaluated.
+
+    Returns:
+        tuple: A tuple containing the accuracy and ROC AUC score of the model.
+    """
     model.eval()
 
     correct = 0
@@ -118,6 +158,21 @@ def test(loader, model):
 
 
 def run_kfold_test(nsplits, graph_data, MODEL_INST, h=16, lr=0.005, b=32):
+    """
+    Run k-fold cross-validation on the given graph data using the specified model.
+
+    Args:
+        nsplits (int): The number of splits for cross-validation.
+        graph_data (list): A list of graph data objects.
+        MODEL_INST (torch.nn.Module): The model class to be instantiated.
+        h (int, optional): The number of hidden channels in the model. Defaults to 16.
+        lr (float, optional): The learning rate for the optimizer. Defaults to 0.005.
+        b (int, optional): The batch size for training. Defaults to 32.
+
+    Returns:
+        tuple: A tuple containing the list of test accuracies and the list of ROC AUC scores for each fold.
+    """
+
     n_data = len(graph_data)
     fold_test_roc = []
     fold_test_acc = []

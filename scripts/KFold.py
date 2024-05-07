@@ -30,6 +30,8 @@ graph_data[0], graph_data[7]
 
 
 kfold_res_df = pd.DataFrame(index=list(range(10)))
+
+
 model = BitterGCN_Baseline(hidden_channels=32)
 fold_test_acc, fold_test_roc = run_kfold_test(nsplits, graph_data, BitterGCN_Baseline)
 kfold_res_df.loc[:, "ACC_GCN_Baseline"] = fold_test_acc

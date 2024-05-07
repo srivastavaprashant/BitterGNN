@@ -36,13 +36,23 @@ from source.analysis import (
 
 
 def train_and_get_embeddings(df):
+    """
+    Trains a model and returns the graph embeddings.
+
+    Args:
+        df (pandas.DataFrame): The input dataframe containing peptide sequences.
+
+    Returns:
+        list: A list of graph embeddings.
+
+    """
     # Initial model setup
     hidden_channels = 16
     epochs = 10
 
     # Read data and preprocess it
     print("Reading peptide sequences data...")
-    print("Preprocessing pretein sequences to create graphs...")
+    print("Preprocessing protein sequences to create graphs...")
     protien_graphs, encoder = preprocess(df)
 
     # Train the model
@@ -57,7 +67,7 @@ def train_and_get_embeddings(df):
     fig.savefig("results/ROC Curve.pdf")
 
     # ## Analysis
-    print("Extracitng graph embeddings...")
+    print("Extracting graph embeddings...")
     train_graph_embeddings = get_graph_embeddings(model, train_loader, encoder)
     test_graph_embeddings = get_graph_embeddings(model, test_loader, encoder)
     all_graph_embeddings = test_graph_embeddings + train_graph_embeddings
@@ -74,6 +84,18 @@ def log_clustering_results(
     embd_type,
     log_file="results/clusters.res",
 ):
+    """
+    Logs the clustering results to a file.
+
+    Args:
+        embd (numpy.ndarray): The embeddings of the peptides.
+        descs (pandas.DataFrame): The descriptions of the peptides.
+        graph_embeddings (numpy.ndarray): The graph embeddings of the peptides.
+        method (str): The clustering method to use.
+        method_args (dict): The arguments for the clustering method.
+        embd_type (str): The type of embeddings used.
+        log_file (str, optional): The path to the log file. Defaults to "results/clusters.res".
+    """
     clusters, kmeans_tsne_embd, aminoacid_pop_in_clusters, fig = get_clusters(
         embd,
         descs,
